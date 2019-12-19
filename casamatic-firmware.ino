@@ -57,12 +57,16 @@ struct payload_t {
 struct event_t {
   byte device_type;
   byte event_type;
-  int temp;
+  uint16_t data;
 };
 
-#define DEVICE_TYPE_TERMOMATIC 1
+#define DEVICE_TYPE_SENSORMATIC 5
+#define DEVICE_TYPE_TECLAMATIC 6
 #define TERMOMATIC_EVENT_DONE 1
 #define TERMOMATIC_EVENT_UPDATE 2
+
+#define SENSORMATIC_EVENT_CURRENT_TEMP 1 // Current Temp
+#define SENSORMATIC_EVENT_SET_TEMP 2 // New Set Temp
 
 #define I2C_ADDRESS 0x4
 
@@ -253,8 +257,8 @@ void sendT(byte tem) {
   }  
 }
 
-void sendTeclamatic() {
-  payload_t rf_payload = { COMMAND_SWITCH, 0};
+void sendTeclamatic(byte command) {
+  payload_t rf_payload = { command, 0};
   Serial.println("Enviando...");
   bool ok = mesh.write(&rf_payload, 'M', sizeof(rf_payload));// , 1);
   Serial.println(ok);
@@ -408,7 +412,7 @@ void loop() {
           stateCalentandoBoot = 1;
           break;
         case IR_POWER:
-          sendTeclamatic();
+          sendTeclamatic(COMMAND_SWITCH);
           break;
         default:
           processNumero = false;
@@ -446,7 +450,7 @@ void loop() {
   }
 
   if (network.available()) {
-    //mesh.saveDHCP();
+    mesh.saveDHCP();
     
     Serial.println("Algo hay...");
       
@@ -461,26 +465,30 @@ void loop() {
 
         display.clear();  
         display.setTextAlignment(TEXT_ALIGN_CENTER);
-        display.drawString(64, 10, "device_type: " + String(event.device_type, DEC) + "\nevent_type: " + String(event.event_type, DEC) + "\ntemp: " + String(event.temp, DEC));
+        display.drawString(64, 10, "device_type: " + String(event.device_type, DEC) + "\nevent_type: " + String(event.event_type, DEC) + "\ndata: " + String(event.data, DEC));
         display.display();
 
-        if (event.device_type == DEVICE_TYPE_TERMOMATIC) {
+        /*if (event.device_type == DEVICE_TYPE_TERMOMATIC) {
           if (event.event_type == TERMOMATIC_EVENT_DONE) {
-            /*lcd.clear();
-            lcd.setCursor(0, 0);
-            lcd.print("Ya esta el agua!:");
-            lcd.setCursor(0, 1);
-            lcd.print("(calentita)");*/
             client.publish("esp/user", "Ya esta lista el agua calentita!");
             musiquita(1);
           }
           if (event.event_type == TERMOMATIC_EVENT_UPDATE) {
-            /*lcd.clear();
-            lcd.setCursor(0, 0);
-            lcd.print("Temp:");
-            lcd.setCursor(0, 1);
-            lcd.print(float(event.temp) / 100);*/
             // client.publish("esp/user", "Ya esta lista el agua calentita!");
+          }
+        } else */
+        
+        if (event.device_type == DEVICE_TYPE_SENSORMATIC) {
+          if (event.event_type == SENSORMATIC_EVENT_CURRENT_TEMP) {
+            if (event.data >= tempSet) {            if (event.data >= tempSet) {
+
+              sendTeclamatic(COMMAND_APAGAR);
+            } else {
+              sendTeclamatic(COMMAND_ENCENDER);  
+            }
+          } else if (event.event_type == SENSORMATIC_EVENT_SET_TEMP) {
+            tempSet = event.data;
+            sendTeclamatic(COMMAND_ENCENDER);
           }
         }
         break;
