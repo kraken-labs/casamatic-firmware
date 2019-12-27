@@ -55,24 +55,34 @@ struct payload_t {
 #define COMMAND_SWITCH 4
 
 struct event_t {
+  char from[6];
   byte device_type;
   byte event_type;
-  uint16_t data;
+  char to[6];
+  byte data;
 };
 
-#define DEVICE_TYPE_SENSORMATIC 5
-#define DEVICE_TYPE_TECLAMATIC 6
-#define TERMOMATIC_EVENT_DONE 1
-#define TERMOMATIC_EVENT_UPDATE 2
+#define DEVICE_TYPE_CASAMATIC 1
+#define DEVICE_TYPE_SENSORMATIC 2
+#define DEVICE_TYPE_TECLAMATIC 3
 
+#define SENSORMATIC_EVENT_PRESENT 0
 #define SENSORMATIC_EVENT_CURRENT_TEMP 1 // Current Temp
 #define SENSORMATIC_EVENT_SET_TEMP 2 // New Set Temp
+#define SENSORMATIC_EVENT_SET_MODE 3
+
+#define CASAMATIC_EVENT_DEVICE_ADDED 1
 
 #define I2C_ADDRESS 0x4
 
+char mac[6] = {'c', 'c', 'c', '0', '0', '0'};
+
 ////////////////////// OLED
 #include "SH1106Wire.h"   // legacy: #include "SH1106.h"
-SH1106Wire display(0x3c, D2, D1);     // ADDRESS, SDA, SCL
+
+SH1106Wire display(0x3c, SDA, SCL);     // ADDRESS, SDA, SCL
+
+//SH1106Wire display(0x3c, D2, D1);     // ADDRESS, SDA, SCL
 
 /*void drawFontFaceDemo() {
     // Font Demo1
@@ -136,7 +146,6 @@ void musiquita(byte i) {
 
 void radioSetup() {
   Serial.println("Setup Radio");
-  // SPI.begin();
   printf_begin();
 
   mesh.setNodeID(0);
@@ -162,18 +171,11 @@ void setup() {
   display.drawString(64, 10, "Booteando...");
   display.display();
 
-  //pinMode(PULSADOR_A, INPUT);
-  //pinMode(PULSADOR_B, INPUT);
-  //pinMode(PULSADOR_C, INPUT);
-
   pinMode(PULSADOR_A, FUNCTION_3);
   pinMode(PULSADOR_B, FUNCTION_3);
   pinMode(PULSADOR_C, FUNCTION_3);
 
-
   Wire.begin();
-
-  //musiquita(1); // testing
   
   WiFi.begin(ssid, password);
  
@@ -185,12 +187,6 @@ void setup() {
     display.setTextAlignment(TEXT_ALIGN_CENTER);
     display.drawString(64, 10, "Conectandose a\nla red WiFi...");
     display.display();
-
-    /*lcd.clear();
-    lcd.setCursor(0, 0);
-    lcd.print("Conectando");
-    lcd.setCursor(0, 1);
-    lcd.print("al Wifi...");*/
   }
   Serial.println("Connected to the WiFi network");
  
@@ -242,18 +238,8 @@ void sendT(byte tem) {
   Serial.println(ok);
   if (ok) {
     Serial.println("ok");
-    /*lcd.clear();
-    lcd.setCursor(0, 0);
-    lcd.print("Joya!");
-    lcd.setCursor(0, 1);
-    lcd.print("Calentando...");*/
   } else {
-    /*
-    lcd.clear();
-    lcd.setCursor(0, 0);
-    lcd.print("Error!");
-    lcd.setCursor(0, 1);
-    lcd.print("Resetear termomatic");*/
+    //
   }  
 }
 
@@ -264,16 +250,8 @@ void sendTeclamatic(byte command) {
   Serial.println(ok);
   if (ok) {
     Serial.println("ok");
-    /*lcd.clear();
-    lcd.setCursor(0, 0);
-    lcd.print("Switch!");*/
   } else {
-    /*
-    lcd.clear();
-    lcd.setCursor(0, 0);
-    lcd.print("Error!");
-    lcd.setCursor(0, 1);
-    lcd.print("Revisar Teclamatic");*/
+    //
   }  
 }
  
@@ -288,29 +266,9 @@ void callback(char* topic, byte* payload, unsigned int length) {
   bool ok = mesh.write(&rf_payload, 'M', sizeof(rf_payload));
   if (ok) {
     Serial.println("ok"); // TODO blink built-in LED
-    /*
-    lcd.clear();
-    lcd.setCursor(0, 0);
-    lcd.print("Joya!");
-    lcd.setCursor(0, 1);
-    lcd.print("Calentando...");*/
   } else {
-    /*
-    lcd.clear();
-    lcd.setCursor(0, 0);
-    lcd.print("Error!");
-    lcd.setCursor(0, 1);
-    lcd.print("Resetear termomatic");*/
     Serial.println("failed");  // TODO send back MQTT error, track entire flow with request ID (h)
   }
-  /*
-  n = payload[0];
-  Serial.print(n);
-  musiquita(n);
- 
-  Serial.println();
-  Serial.println("-----------------------");
-  */
 }
  
 void loop() {
@@ -323,120 +281,8 @@ void loop() {
     if (stateIdleBoot == 1) {
       tempSet = 0;
       tempInputMultiplo = 1;
-      /*lcd.clear();
-      lcd.setCursor(0, 0);
-      lcd.print("CasaMatic v0.1");
-      lcd.setCursor(0, 1);
-      lcd.print("----------------");*/           
       stateIdleBoot = 0;
     }
-
-    bool processNumero = false;
-
-  /*
-    display.clear();  
-    display.setTextAlignment(TEXT_ALIGN_CENTER);
-    display.drawString(64, 10, "Apretate algo");
-    display.display(); */
-
-  /*
-    if (digitalRead(PULSADOR_A) == HIGH) {
-      display.clear();  
-      display.setTextAlignment(TEXT_ALIGN_CENTER);
-      display.drawString(64, 10, "Pulsador A");
-      display.display();
-      delay(1000);
-    }
-    if (digitalRead(PULSADOR_B) == HIGH) {
-      display.clear();  
-      display.setTextAlignment(TEXT_ALIGN_CENTER);
-      display.drawString(64, 10, "Pulsador B");
-      display.display();
-      delay(1000);
-    }
-    if (digitalRead(PULSADOR_C) == HIGH) {
-      display.clear();  
-      display.setTextAlignment(TEXT_ALIGN_CENTER);
-      display.drawString(64, 10, "Pulsador C");
-      display.display();
-      delay(1000);
-    }*/
-
-    /*if (irrecv.decode(&results)) {
-      Serial.println((long)results.value, HEX);
-
-      switch (results.value) {                                                                                                                                                                                                              
-        case IR_DIGIT_1:                                                                                                                                                                                                             
-          tempInputAux = 1;                                                                                                                                                                                                          
-          processNumero = true;                                                                                                                                                                                                      
-          break;                                                                                                                                                                                                                     
-        case IR_DIGIT_2:                                                                                                                                                                                                             
-          tempInputAux = 2;                                                                                                                                                                                                          
-          processNumero = true;                                                                                                                                                                                                      
-          break;                                                                                                                                                                                                                     
-        case IR_DIGIT_3:                                                                                                                                                                                                             
-          tempInputAux = 3;                                                                                                                                                                                                          
-          processNumero = true;                                                                                                                                                                                                      
-          break;                                                                                                                                                                                                                     
-        case IR_DIGIT_4:                                                                                                                                                                                                             
-          tempInputAux = 4;                                                                                                                                                                                                          
-          processNumero = true;                                                                                                                                                                                                      
-          break;                                                                                                                                                                                                                     
-        case IR_DIGIT_5:                                                                                                                                                                                                             
-          tempInputAux = 5;                                                                                                                                                                                                          
-          processNumero = true;                                                                                                                                                                                                      
-          break;                                                                                                                                                                                                                     
-        case IR_DIGIT_6:                                                                                                                                                                                                             
-          tempInputAux = 6;                                                                                                                                                                                                          
-          processNumero = true;                                                                                                                                                                                                      
-          break;                                                                                                                                                                                                                     
-        case IR_DIGIT_7:                                                                                                                                                                                                             
-          tempInputAux = 7;                                                                                                                                                                                                          
-          processNumero = true;                                                                                                                                                                                                      
-          break;                                                                                                                                                                                                                     
-        case IR_DIGIT_8:                                                                                                                                                                                                             
-          tempInputAux = 8;                                                                                                                                                                                                          
-          processNumero = true;                                                                                                                                                                                                      
-          break;                                                                                                                                                                                                                     
-        case IR_DIGIT_9:                                                                                                                                                                                                             
-          tempInputAux = 9;                                                                                                                                                                                                          
-          processNumero = true;                                                                                                                                                                                                      
-          break;                                                                                                                                                                                                                     
-        case IR_DIGIT_0:                                                                                                                                                                                                             
-          tempInputAux = 0;                                                                                                                                                                                                          
-          processNumero = true;                                                                                                                                                                                                      
-          break;
-        case IR_JUMP:
-          tempPrograma = tempSet;                                                                                                                                                                                                    
-          state = STATE_CALENTANDO;
-          stateCalentandoBoot = 1;
-          break;
-        case IR_POWER:
-          sendTeclamatic(COMMAND_SWITCH);
-          break;
-        default:
-          processNumero = false;
-          Serial.println((long)results.value, HEX);                                                                                                                                                                                                  
-      }
-
-      if (processNumero == true) {
-        if (tempInputMultiplo == 1) {                                                                                                                                                                                                
-          tempSet = 0;                                                                                                                                                                                                               
-        }                                                                                                                                                                                                                            
-        tempSet = tempSet * tempInputMultiplo + tempInputAux;                                                                                                                                                                        
-        tempInputMultiplo = tempInputMultiplo * 10;                                                                                                                                                                                  
-        if (tempInputMultiplo == 100) {                                                                                                                                                                                              
-          tempInputMultiplo = 1;                                                                                                                                                                                                     
-        }
-        lcd.clear();                                                                                                                                                                                                                 
-        lcd.setCursor(0, 0);                                                                                                                                                                                                         
-        lcd.print("Temperatura:");                                                                                                                                                                                                   
-        lcd.setCursor(0, 1);                                                                                                                                                                                                         
-        lcd.print(tempSet);
-      }
-
-      irrecv.resume();
-    }*/
   } else if (state == STATE_CALENTANDO) {
     if (stateCalentandoBoot == 1) {
       Serial.println("Calentar a");
@@ -461,13 +307,18 @@ void loop() {
     switch(header.type){
       // Display the incoming millis() values from the sensor nodes
       case 'M':
+        {
         network.read(header, &event, sizeof(event));
+        char from[7] = { 0 };
+        char to[7] = { 0 };
+        memcpy(from, event.from, sizeof(char) * 6);
+        memcpy(to, event.to, sizeof(char) * 6);
 
         display.clear();  
         display.setTextAlignment(TEXT_ALIGN_CENTER);
-        display.drawString(64, 10, "device_type: " + String(event.device_type, DEC) + "\nevent_type: " + String(event.event_type, DEC) + "\ndata: " + String(event.data, DEC));
+        display.drawString(64, 10, "f: " + String(from) + "\ndev_type: " + String(event.device_type, DEC) + "\nev_type: " + String(event.event_type, DEC) + "\ndata: " + String(event.data, DEC));
         display.display();
-
+        
         /*if (event.device_type == DEVICE_TYPE_TERMOMATIC) {
           if (event.event_type == TERMOMATIC_EVENT_DONE) {
             client.publish("esp/user", "Ya esta lista el agua calentita!");
@@ -479,12 +330,38 @@ void loop() {
         } else */
         
         if (event.device_type == DEVICE_TYPE_SENSORMATIC) {
-          if (event.event_type == SENSORMATIC_EVENT_CURRENT_TEMP) {
-            if (event.data >= tempSet) {            if (event.data >= tempSet) {
+          if (event.event_type == SENSORMATIC_EVENT_PRESENT) {
+            Serial.println(event.from);
+            event_t payload;
+            payload.device_type = DEVICE_TYPE_CASAMATIC;
+            payload.event_type = CASAMATIC_EVENT_DEVICE_ADDED;
+            payload.data = 0;
+            memcpy(payload.from, mac, sizeof(char) * 6);
+            memcpy(payload.to, event.from, sizeof(event.from));
 
-              sendTeclamatic(COMMAND_APAGAR);
+            bool ok = mesh.write(&payload, 'M', sizeof(payload));
+            if (ok) {
+              Serial.println("ok");
+
+              char from[7] = { 0 };
+              char to[7] = { 0 };
+              memcpy(from, payload.from, sizeof(char) * 6);
+              memcpy(to, payload.to, sizeof(char) * 6);
+        
+              display.clear();  
+              display.setTextAlignment(TEXT_ALIGN_CENTER);
+              display.drawString(64, 10, "from: " + String(from) + "\nto: " + String(to));
+              display.display();
             } else {
-              sendTeclamatic(COMMAND_ENCENDER);  
+              // TODO
+            }
+          } else if (event.event_type == SENSORMATIC_EVENT_CURRENT_TEMP) {
+            if (event.data >= tempSet) {
+              //sendTeclamatic(COMMAND_APAGAR); // estufa
+              sendTeclamatic(COMMAND_ENCENDER); // ventilador
+            } else {
+              // sendTeclamatic(COMMAND_ENCENDER); // estufa
+              sendTeclamatic(COMMAND_APAGAR); // ventilador
             }
           } else if (event.event_type == SENSORMATIC_EVENT_SET_TEMP) {
             tempSet = event.data;
@@ -492,6 +369,7 @@ void loop() {
           }
         }
         break;
+        }
       default:
         network.read(header,0,0);
         Serial.println(header.type);
