@@ -55,10 +55,10 @@ struct payload_t {
 #define COMMAND_SWITCH 4
 
 struct event_t {
-  char from[6];
+  char from[5];
   byte device_type;
   byte event_type;
-  char to[6];
+  char to[5];
   byte data;
 };
 
@@ -75,7 +75,7 @@ struct event_t {
 
 #define I2C_ADDRESS 0x4
 
-char mac[6] = {'c', 'c', 'c', '0', '0', '0'};
+char mac[5] = {'c', 'c', 'c', '0', 0};
 
 ////////////////////// OLED
 #include "SH1106Wire.h"   // legacy: #include "SH1106.h"
@@ -134,6 +134,8 @@ void drawProgressBarDemo() {
 #define PULSADOR_B 3
 #define PULSADOR_C 16
 
+#define RF_CHANNEL 44
+
 ///////////////////////////
 
 void musiquita(byte i) {
@@ -149,7 +151,7 @@ void radioSetup() {
   printf_begin();
 
   mesh.setNodeID(0);
-  mesh.begin(40, RF24_250KBPS, 1000);
+  mesh.begin(RF_CHANNEL, RF24_250KBPS, 1000);
   mesh.loadDHCP();
 
   radio.printDetails();
@@ -161,9 +163,7 @@ void setup() {
   Serial.println();
   Serial.println();
 
-  // Initialising the UI will init the display too.
   display.init();
-  //display.flipScreenVertically();
   display.setFont(ArialMT_Plain_10);
 
   display.clear();  
@@ -176,7 +176,6 @@ void setup() {
   pinMode(PULSADOR_C, FUNCTION_3);
 
   Wire.begin();
-  
   WiFi.begin(ssid, password);
  
   while (WiFi.status() != WL_CONNECTED) {
@@ -188,24 +187,21 @@ void setup() {
     display.drawString(64, 10, "Conectandose a\nla red WiFi...");
     display.display();
   }
-  Serial.println("Connected to the WiFi network");
  
   client.setServer(mqttServer, mqttPort);
   client.setCallback(callback);
  
   while (!client.connected()) {
-    Serial.println("Connecting to MQTT...");
-
     display.clear();  
     display.setTextAlignment(TEXT_ALIGN_CENTER);
     display.drawString(64, 10, "Conectandose a\nMQTT...");
     display.display();
  
-    if (client.connect("ESP8266Client", mqttUser, mqttPassword )) {
-      Serial.println("connected");
-    } else {
-      Serial.print("failed with state ");
-      Serial.print(client.state());
+    if (!client.connect("ESP8266Client", mqttUser, mqttPassword )) {
+      display.clear();
+      display.setTextAlignment(TEXT_ALIGN_CENTER);
+      display.drawString(64, 10, "Error conectando\na MQTT...");
+      display.display();
       delay(2000);
     }
   }
@@ -289,7 +285,7 @@ void loop() {
       Serial.println(tempSet);
       sendT((byte)tempSet);
       stateCalentandoBoot = 0;
-      state = STATE_PROGRAM_IDLE;                                                                                                                                                                                                      
+      state = STATE_PROGRAM_IDLE;
       stateIdleBoot = 1;
     }
             
@@ -297,8 +293,6 @@ void loop() {
 
   if (network.available()) {
     mesh.saveDHCP();
-    
-    Serial.println("Algo hay...");
       
     RF24NetworkHeader header;
     network.peek(header);
@@ -309,10 +303,10 @@ void loop() {
       case 'M':
         {
         network.read(header, &event, sizeof(event));
-        char from[7] = { 0 };
-        char to[7] = { 0 };
-        memcpy(from, event.from, sizeof(char) * 6);
-        memcpy(to, event.to, sizeof(char) * 6);
+        char from[5] = { 0 };
+        char to[5] = { 0 };
+        memcpy(from, event.from, sizeof(char) * 5);
+        memcpy(to, event.to, sizeof(char) * 5);
 
         display.clear();  
         display.setTextAlignment(TEXT_ALIGN_CENTER);
@@ -331,29 +325,33 @@ void loop() {
         
         if (event.device_type == DEVICE_TYPE_SENSORMATIC) {
           if (event.event_type == SENSORMATIC_EVENT_PRESENT) {
-            Serial.println(event.from);
             event_t payload;
             payload.device_type = DEVICE_TYPE_CASAMATIC;
             payload.event_type = CASAMATIC_EVENT_DEVICE_ADDED;
             payload.data = 0;
-            memcpy(payload.from, mac, sizeof(char) * 6);
-            memcpy(payload.to, event.from, sizeof(event.from));
+            memcpy(payload.from, mac, sizeof(char) * 5);
+            memcpy(payload.to, event.from, sizeof(event.from) * 5);
 
             bool ok = mesh.write(&payload, 'M', sizeof(payload));
+
+            char from[5] = { 0 };
+            char to[5] = { 0 };
+            memcpy(from, payload.from, sizeof(char) * 5);
+            memcpy(to, payload.to, sizeof(char) * 5);
+        
+            display.clear();
+            display.setTextAlignment(TEXT_ALIGN_CENTER);
+            display.drawString(64, 10, "from: " + String(from) + "\nto: " + String(to));
+            display.display();
             if (ok) {
               Serial.println("ok");
-
-              char from[7] = { 0 };
-              char to[7] = { 0 };
-              memcpy(from, payload.from, sizeof(char) * 6);
-              memcpy(to, payload.to, sizeof(char) * 6);
-        
-              display.clear();  
-              display.setTextAlignment(TEXT_ALIGN_CENTER);
-              display.drawString(64, 10, "from: " + String(from) + "\nto: " + String(to));
-              display.display();
             } else {
               // TODO
+              delay(1000);
+              display.clear();
+              display.setTextAlignment(TEXT_ALIGN_CENTER);
+              display.drawString(64, 10, "Error!");
+              display.display();
             }
           } else if (event.event_type == SENSORMATIC_EVENT_CURRENT_TEMP) {
             if (event.data >= tempSet) {
